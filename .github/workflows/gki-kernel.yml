@@ -601,6 +601,22 @@ jobs:
             set -e
             set -x
             cd "$CONFIG"
+            
+            # --- HOTFIX: 修补 SukiSU + SUSFS 的内核补丁重定义冲突 ---
+            # 因为我们需要保留 SukiSU 的 KPM 特性，并且避免 SUSFS 强行加上双份 ksu_handle_devpts，
+            # 在执行编译之前，把它做一次智能重命名。
+            if [ -f "common/drivers/kernelsu/feature/sucompat.c" ]; then
+                python3 -c "
+import os
+path = 'common/drivers/kernelsu/feature/sucompat.c'
+content = open(path).read()
+pieces = content.split('ksu_handle_devpts(struct inode *inode)')
+if len(pieces) > 2:
+    open(path, 'w').write(pieces[0] + 'ksu_handle_devpts(struct inode *inode)' + pieces[1] + 'ksu_handle_devpts_dup(struct inode *inode)' + pieces[2])
+" || true
+            fi
+            # --------------------------------------------------
+
             # 替换 BUILD_SYSTEM_DLKM=1 为 BUILD_SYSTEM_DLKM=0
             sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' common/build.config.gki.aarch64
 
